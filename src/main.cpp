@@ -3328,7 +3328,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // Fees from a transaction do not go into an output of the transaction,
             // and therefore decrease the chain supply. If the miner claims them,
             // they will be re-added in the other branch of this conditional.
-            chainSupplyDelta -= txFee;
+            chainSupplyDelta -= txFee + tx.nZsfDepositAmount;
 
             std::vector<CScriptCheck> vChecks;
             if (!ContextualCheckInputs(tx, state, view, fExpensiveChecks, flags, fCacheResults, txdata.back(), consensusParams, consensusBranchId, nScriptCheckThreads ? &vChecks : NULL))
