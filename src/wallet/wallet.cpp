@@ -5566,7 +5566,12 @@ bool CWallet::CreateTransaction(
         max_tx_size = MAX_TX_SIZE_BEFORE_SAPLING;
     }
 
-    txNew.nZsfDepositAmount = nZsfDepositAmount;
+    if (Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ZFUTURE)) {
+        txNew.nZsfDepositAmount = nZsfDepositAmount;
+    } else if (nZsfDepositAmount > 0) {
+        strFailReason = _("ZSF deposit is not supported at this block height.");
+        return false;
+    }
 
     // Discourage fee sniping.
     //
