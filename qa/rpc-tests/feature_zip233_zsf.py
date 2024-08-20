@@ -123,6 +123,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
             expected_chain_value
         )
 
+        #####
         # Try the same using createrawtransaction
         raw_transaction = (
             alice.createrawtransaction(
@@ -165,6 +166,53 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(
             bob.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
+        )
+
+        #####
+        # Check that we can make a ZSF deposit without a vout
+        raw_transaction = (
+            alice.createrawtransaction(
+                [],
+                {},
+                None,
+                None,
+                zsf_deposit_amount
+            )
+        )
+        funded_transaction = alice.fundrawtransaction(raw_transaction)
+        signed_transaction = alice.signrawtransaction(funded_transaction["hex"])
+        alice.sendrawtransaction(signed_transaction["hex"])
+
+        alice.generate(1)
+        self.sync_all()
+
+        expected_alice_balance += (
+            BLOCK_REWARD
+            - zsf_deposit_amount
+            - TRANSACTION_FEE
+        )
+
+        assert_equal(alice.getbalance(), expected_alice_balance)
+        assert_equal(bob.getbalance(), expected_bob_balance)
+
+        expected_chain_value += BLOCK_REWARD - zsf_deposit_amount
+        assert_equal(
+            alice.getblockchaininfo()["chainSupply"]["chainValue"],
+            expected_chain_value
+        )
+        assert_equal(
+            bob.getblockchaininfo()["chainSupply"]["chainValue"],
+            expected_chain_value
+        )
+
+        #####
+        # Check that we can't make a truly empty transaction
+        raw_transaction = alice.createrawtransaction([], {}, None, None, 0)
+        assert_raises_message(
+            JSONRPCException,
+            "Transaction amounts must be positive",
+            alice.fundrawtransaction,
+            raw_transaction
         )
 
 if __name__ == '__main__':
