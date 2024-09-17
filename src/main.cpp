@@ -2220,9 +2220,9 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
     }
 
     // Check the header
-    if (!(CheckEquihashSolution(&block, consensusParams) &&
-          CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
-        return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+    // if (!(CheckEquihashSolution(&block, consensusParams) &&
+    //       CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
+    //     return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     return true;
 }
@@ -4956,14 +4956,14 @@ bool CheckBlockHeader(
                          REJECT_INVALID, "version-too-low");
 
     // Check Equihash solution is valid
-    if (fCheckPOW && !CheckEquihashSolution(&block, chainparams.GetConsensus()))
-        return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),
-                         REJECT_INVALID, "invalid-solution");
+    // if (fCheckPOW && !CheckEquihashSolution(&block, chainparams.GetConsensus()))
+    //     return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),
+    //                      REJECT_INVALID, "invalid-solution");
 
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus()))
-        return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
-                         REJECT_INVALID, "high-hash");
+    // if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus()))
+    //     return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
+    //                      REJECT_INVALID, "high-hash");
 
     return true;
 }
