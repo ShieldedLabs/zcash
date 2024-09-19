@@ -271,5 +271,43 @@ class Zip233ZsfTest(BitcoinTestFramework):
             raw_transaction
         )
 
+        #####
+        # Deposit from coinbase transaction
+        chain_value = alice.getblockchaininfo()["chainSupply"]["chainValue"]
+
+        block_hash = alice.generate(1, zsf_deposit_amount)[0]
+        self.sync_all()
+
+        expected_coinbase_output = BLOCK_REWARD - zsf_deposit_amount
+        transaction_hash = alice.getblock(block_hash)["tx"][0]
+        assert_equal(
+            alice.gettransaction(transaction_hash)["details"][0]["amount"],
+            expected_coinbase_output
+        )
+
+        expected_chain_value = chain_value + BLOCK_REWARD - zsf_deposit_amount
+        assert_equal(
+            alice.getblockchaininfo()["chainSupply"]["chainValue"],
+            expected_chain_value
+        )
+        assert_equal(
+            bob.getblockchaininfo()["chainSupply"]["chainValue"],
+            expected_chain_value
+        )
+
+        assert_raises_message(
+            JSONRPCException,
+            "Amount out of range",
+            alice.generate,
+            1, -1
+        )
+
+        assert_raises_message(
+            JSONRPCException,
+            "ZSF deposit in coinbase transaction must not exceed miner reward",
+            alice.generate,
+            1, 999
+        )
+
 if __name__ == '__main__':
     Zip233ZsfTest().main()
