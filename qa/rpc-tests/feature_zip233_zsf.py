@@ -19,6 +19,7 @@ from test_framework.util import (
 import time
 
 from decimal import Decimal
+from math import ceil
 
 class Zip233ZsfTest(BitcoinTestFramework):
 
@@ -40,9 +41,16 @@ class Zip233ZsfTest(BitcoinTestFramework):
         self.sync_all()
 
     def run_test(self):
-        BLOCK_REWARD = Decimal("6.25")
+        OLD_BLOCK_REWARD = Decimal("6.25")
         COINBASE_MATURATION_BLOCK_COUNT = 100
+        MAX_MONEY = 21_000_000
         TRANSACTION_FEE = Decimal("0.0001")
+
+        def zsf_block_reward(chain_value):
+            zatoshi = Decimal(100_000_000)
+            issuance_reserve = (MAX_MONEY - chain_value) * zatoshi
+            reward_zatoshi = ceil(issuance_reserve * 4_126 / 10_000_000_000)
+            return reward_zatoshi / zatoshi
 
         alice, bob = self.nodes
 
@@ -55,7 +63,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         block_height = 1 + COINBASE_MATURATION_BLOCK_COUNT
         self.sync_all()
 
-        expected_chain_value = BLOCK_REWARD * block_height
+        expected_chain_value = OLD_BLOCK_REWARD * block_height
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
@@ -66,7 +74,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         )
 
         # Only the first block's coinbase has reached maturity
-        assert_equal(alice.getbalance(), BLOCK_REWARD)
+        assert_equal(alice.getbalance(), OLD_BLOCK_REWARD)
         assert_equal(bob.getbalance(), 0)
 
         bob_address = bob.getnewaddress()
@@ -92,28 +100,31 @@ class Zip233ZsfTest(BitcoinTestFramework):
         # the following block.
         alice.generate(1)
         block_height += 1
+        expected_chain_value += OLD_BLOCK_REWARD
 
         # And now the same RPC call should succeed
         alice.sendtoaddress(*sendtoaddress_args)
 
         # Using the other node to mine ensures we test transaction serialization
+        # in the mempool.
         sync_mempools([alice, bob])
         bob.generate(1)
         block_height += 1
         self.sync_all()
 
+        # Alice's pre-upgrade coinbase continues to mature 100 blocks behind
         expected_alice_balance = (
-            (BLOCK_REWARD * 3)
+            (OLD_BLOCK_REWARD * 3)
             - send_amount
             - zsf_deposit_amount
             - TRANSACTION_FEE
         )
         expected_bob_balance = send_amount
+        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
 
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
 
-        expected_chain_value = BLOCK_REWARD * block_height - zsf_deposit_amount
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
@@ -148,7 +159,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(bob.getrawtransaction(transaction_hash, 1)["zsfDeposit"], zsf_deposit_amount)
 
         expected_alice_balance += (
-            BLOCK_REWARD
+            OLD_BLOCK_REWARD
             - send_amount
             - zsf_deposit_amount
             - TRANSACTION_FEE
@@ -158,7 +169,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
 
-        expected_chain_value += BLOCK_REWARD - zsf_deposit_amount
+        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
@@ -187,7 +198,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         self.sync_all()
 
         expected_alice_balance += (
-            BLOCK_REWARD
+            OLD_BLOCK_REWARD
             - zsf_deposit_amount
             - TRANSACTION_FEE
         )
@@ -195,7 +206,7 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
 
-        expected_chain_value += BLOCK_REWARD - zsf_deposit_amount
+        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
@@ -278,14 +289,14 @@ class Zip233ZsfTest(BitcoinTestFramework):
         block_hash = alice.generate(1, zsf_deposit_amount)[0]
         self.sync_all()
 
-        expected_coinbase_output = BLOCK_REWARD - zsf_deposit_amount
+        expected_coinbase_output = zsf_block_reward(chain_value) - zsf_deposit_amount
         transaction_hash = alice.getblock(block_hash)["tx"][0]
         assert_equal(
             alice.gettransaction(transaction_hash)["details"][0]["amount"],
             expected_coinbase_output
         )
 
-        expected_chain_value = chain_value + BLOCK_REWARD - zsf_deposit_amount
+        expected_chain_value = chain_value + zsf_block_reward(chain_value) - zsf_deposit_amount
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value

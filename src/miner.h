@@ -96,7 +96,13 @@ struct CBlockTemplate
     std::vector<int64_t> vTxSigOps;
 };
 
-CMutableTransaction CreateCoinbaseTransaction(const CChainParams& chainparams, CAmount nFees, const MinerAddress& minerAddress, int nHeight, const CAmount nZsfDepositAmount);
+CMutableTransaction CreateCoinbaseTransaction(
+    const CChainParams& chainparams,
+    CAmount nFees,
+    const MinerAddress& minerAddress,
+    int nHeight,
+    const CAmount nZsfDepositAmount,
+    const CAmount nIssuanceReserve);
 
 /** Generate a new block, without valid proof-of-work */
 class BlockAssembler
