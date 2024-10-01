@@ -3606,6 +3606,17 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     int64_t nTime1 = GetTimeMicros(); nTimeConnect += nTime1 - nTimeStart;
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
 
+    if (consensusParams.NetworkUpgradeActive(pindex->nHeight, Consensus::UPGRADE_ZFUTURE)) {
+        const CAmount cbZsfDeposit{block.vtx[0].nZsfDepositAmount};
+        const CAmount minDeposit{nFees * 6 / 10};
+        if (cbZsfDeposit < minDeposit) {
+            return state.DoS(100,
+                error("%s: coinbase ZSF deposit is insufficient (actual=%d vs expected=%d)", __func__, cbZsfDeposit, minDeposit),
+                REJECT_INVALID,
+                "bad-cb-insufficient-zsf-deposit");
+        }
+    }
+
     const CAmount nIssuanceReserve{(pindex->pprev == nullptr) ? MAX_MONEY : pindex->pprev->GetIssuanceReserve()};
     CAmount cbTotalOutputValue = block.vtx[0].GetValueOut() + pindex->nLockboxValue;
     CAmount cbTotalInputValue = consensusParams.GetBlockSubsidy(pindex->nHeight, nIssuanceReserve) + nFees;

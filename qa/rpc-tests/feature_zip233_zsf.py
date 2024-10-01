@@ -41,16 +41,17 @@ class Zip233ZsfTest(BitcoinTestFramework):
         self.sync_all()
 
     def run_test(self):
+        ZATOSHI = Decimal(100_000_000)
         OLD_BLOCK_REWARD = Decimal("6.25")
         COINBASE_MATURATION_BLOCK_COUNT = 100
         MAX_MONEY = 21_000_000
         TRANSACTION_FEE = Decimal("0.0001")
+        MIN_COINBASE_ZSF_DEPOSIT = TRANSACTION_FEE * 6 / 10
 
         def zsf_block_reward(chain_value):
-            zatoshi = Decimal(100_000_000)
-            issuance_reserve = (MAX_MONEY - chain_value) * zatoshi
+            issuance_reserve = (MAX_MONEY - chain_value) * ZATOSHI
             reward_zatoshi = ceil(issuance_reserve * 4_126 / 10_000_000_000)
-            return reward_zatoshi / zatoshi
+            return reward_zatoshi / ZATOSHI
 
         alice, bob = self.nodes
 
@@ -120,7 +121,11 @@ class Zip233ZsfTest(BitcoinTestFramework):
             - TRANSACTION_FEE
         )
         expected_bob_balance = send_amount
-        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
+        expected_chain_value += (
+            zsf_block_reward(expected_chain_value) -
+            MIN_COINBASE_ZSF_DEPOSIT -
+            zsf_deposit_amount
+        )
 
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
@@ -153,6 +158,13 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(alice.decoderawtransaction(funded_transaction["hex"])["zsfDeposit"], zsf_deposit_amount)
         assert_equal(alice.decoderawtransaction(signed_transaction["hex"])["zsfDeposit"], zsf_deposit_amount)
 
+        assert_raises_message(
+            JSONRPCException,
+            "CreateNewBlock: TestBlockValidity failed: bad-cb-insufficient-zsf-deposit (code 16)",
+            alice.generate,
+            1, MIN_COINBASE_ZSF_DEPOSIT - (1 / ZATOSHI)
+        )
+
         alice.generate(1)
         self.sync_all()
 
@@ -169,7 +181,11 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
 
-        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
+        expected_chain_value += (
+            zsf_block_reward(expected_chain_value) -
+            MIN_COINBASE_ZSF_DEPOSIT -
+            zsf_deposit_amount
+        )
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value
@@ -194,7 +210,8 @@ class Zip233ZsfTest(BitcoinTestFramework):
         signed_transaction = alice.signrawtransaction(funded_transaction["hex"])
         alice.sendrawtransaction(signed_transaction["hex"])
 
-        alice.generate(1)
+        # A null should cause the minimum deposit to be used too.
+        alice.generate(1, None)
         self.sync_all()
 
         expected_alice_balance += (
@@ -206,7 +223,11 @@ class Zip233ZsfTest(BitcoinTestFramework):
         assert_equal(alice.getbalance(), expected_alice_balance)
         assert_equal(bob.getbalance(), expected_bob_balance)
 
-        expected_chain_value += zsf_block_reward(expected_chain_value) - zsf_deposit_amount
+        expected_chain_value += (
+            zsf_block_reward(expected_chain_value) -
+            MIN_COINBASE_ZSF_DEPOSIT -
+            zsf_deposit_amount
+        )
         assert_equal(
             alice.getblockchaininfo()["chainSupply"]["chainValue"],
             expected_chain_value

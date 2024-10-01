@@ -285,15 +285,16 @@ CMutableTransaction CreateCoinbaseTransaction(
     CAmount nFees,
     const MinerAddress& minerAddress,
     int nHeight,
-    const CAmount nZsfDepositAmount,
+    const std::optional<CAmount> nZsfDepositAmount,
     const CAmount nIssuanceReserve)
 {
+    const auto& consensus{chainparams.GetConsensus()};
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(
-        chainparams.GetConsensus(), nHeight,
+        consensus, nHeight,
         !std::holds_alternative<libzcash::OrchardRawAddress>(minerAddress) && nPreferredTxVersion < ZIP225_MIN_TX_VERSION);
     mtx.vin.resize(1);
     mtx.vin[0].prevout.SetNull();
-    if (chainparams.GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_NU5)) {
+    if (consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_NU5)) {
         // ZIP 203: From NU5 onwards, nExpiryHeight is set to the block height in
         // coinbase transactions.
         mtx.nExpiryHeight = nHeight;
@@ -302,8 +303,17 @@ CMutableTransaction CreateCoinbaseTransaction(
         mtx.nExpiryHeight = 0;
     }
 
+    // Apply voluntary ZSF deposit if provided, or else apply the minimum.
+    const CAmount minZsfDeposit{
+        consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_ZFUTURE) ?
+            nFees * 6 / 10 :
+            0};
+    mtx.nZsfDepositAmount =
+        nZsfDepositAmount.has_value() ?
+            nZsfDepositAmount.value() :
+            minZsfDeposit;
+
     // Add outputs and sign
-    mtx.nZsfDepositAmount = nZsfDepositAmount;
     std::visit(
         AddOutputsToCoinbaseTxAndSign(mtx, chainparams, nHeight, nFees, nIssuanceReserve),
         minerAddress);
@@ -353,7 +363,7 @@ void BlockAssembler::resetBlock(const MinerAddress& minerAddress)
 CBlockTemplate* BlockAssembler::CreateNewBlock(
     const MinerAddress& minerAddress,
     const std::optional<CMutableTransaction>& next_cb_mtx,
-    const CAmount nZsfDepositAmount)
+    const std::optional<CAmount> nZsfDepositAmount)
 {
     resetBlock(minerAddress);
 
